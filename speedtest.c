@@ -62,29 +62,6 @@ __attribute__((optnone)) void blank_call(double x) {
 #define PI_SQUARED M_PI*M_PI
 #define ONE_POINT_FIVE_PI M_PI_2*3
 
-double cosBhaskara(double angle) {
-  if (angle > M_PI_2) {
-    /*
-     * Bhaskara's formula seems to only approximate the range (-M_PI_2,M_PI_2)
-     * So, if we are larger, we mirror it and add angle by PI
-     * If we are larger than 1.5 * PI then we add 2 PI to angle
-     * Maybe there's a way to do this using only 2 conditions
-     * considering we only need the range (0,DOUBLE_PI) but
-     * I don't know how unfortunately :P
-    */
-    if (angle < ONE_POINT_FIVE_PI) {
-      /* Mirror and add PI to angle */
-      angle += M_PI;
-      double angleSquared = angle*angle;
-      return -1 * (PI_SQUARED - (4 * angleSquared)) / (PI_SQUARED + angleSquared);
-    }
-    /* Don't mirror but add 2PI to angle */
-    angle += M_PI*2;
-  }
-  double angleSquared = angle*angle;
-  return (PI_SQUARED - (4 * angleSquared)) / (PI_SQUARED + angleSquared);
-}
-
 /*
  * The following is an implementation of
  * Bhaskara's cosine formula. This accurately
