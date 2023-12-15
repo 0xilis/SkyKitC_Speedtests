@@ -85,10 +85,42 @@ double cosBhaskara(double angle) {
   return (PI_SQUARED - (4 * angleSquared)) / (PI_SQUARED + angleSquared);
 }
 
-__attribute__((always_inline)) static double cosBhaskara2(double angle) {
+/*
+ * The following is an implementation of
+ * Bhaskara's cosine formula. This accurately
+ * approximates the cosine and is pretty fast.
+ * In the context SkyKitC gets the cosine;
+ * the *only* time it ever needs the cosine is
+ * for the calcPos() function. Therefore, we
+ * only ever need to approximate range
+ * [0,M_PI*2]. Bhaskara's cosine approximates
+ * [-M_PI_2,M_PI_2] which is not enough for us but
+ * as explained in the comment below, we
+ * simply just mirror and sub angle by M_PI
+ * if our angle is in range (M_PI_2,3*M_PI_2)
+ * and if our angle is larger than 3*M_PI_2
+ * then we subtract our angle by 2*M_PI.
+ * This should clear us an accurate range
+ * of [-M_PI_2,M_PI_2*5] which covers more
+ * than what we need. This logic does however
+ * add conditionals to our function which I
+ * really am not a fan of; hence why I tried
+ * to look for an approximation algorithm
+ * that would still be speedy while supporting
+ * a wider range, which is implemented in
+ * cosBhaskaraAndSnoolieV2/cosBhaskaraAndSnoolie
+ * with cosBhaskaraAndSnoolieV2 being slightly
+ * more accurate than cosBhaskaraAndSnoolie.
+ * This still doesn't handle a range enough
+ * that would allow us to use no conditionals,
+ * but we do use one less conditional, meaning
+ * only one conditional instead of two.
+*/
+
+__attribute__((always_inline)) static double cosBhaskara(double angle) {
   if (angle > M_PI_2) {
     /*
-     * Bhaskara's formula seems to only approximate the range (-M_PI_2,M_PI_2)
+     * Bhaskara's formula seems to only approximate the range [-M_PI_2,M_PI_2]
      * So, if we are larger, we mirror it and add angle by PI
      * If we are larger than 1.5 * PI then we add 2 PI to angle
      * Maybe there's a way to do this using only 2 conditions
@@ -97,12 +129,12 @@ __attribute__((always_inline)) static double cosBhaskara2(double angle) {
     */
     if (angle < ONE_POINT_FIVE_PI) {
       /* Mirror and add PI to angle */
-      angle += M_PI;
+      angle -= M_PI;
       double angleSquared = angle*angle;
       return -1 * (PI_SQUARED - (4 * angleSquared)) / (PI_SQUARED + angleSquared);
     }
     /* Don't mirror but add 2PI to angle */
-    angle += M_PI*2;
+    angle -= M_PI*2;
   }
   double angleSquared = angle*angle;
   return (PI_SQUARED - (4 * angleSquared)) / (PI_SQUARED + angleSquared);
@@ -130,44 +162,12 @@ __attribute__((always_inline)) static double cosBhaskaraAndSnoolie(double angle)
   return (PI_SQUARED - (4 * angleSquared)) / (PI_SQUARED + angleSquared);
 }
 
-__attribute__((always_inline)) static double sinFromCosBhaskara(double angle) {
-  double doublePi = M_PI*2;
-  double angleSquared = angle*angle;
-  double resultCos = (doublePi - (4 * angleSquared)) / (doublePi + angleSquared);
-  return sqrt(1 - (resultCos * resultCos));
-}
-
 __attribute__((always_inline)) static double sinBhaskara(double angle) {
   double doublePi = M_PI*2;
   return (16 * angle * (M_PI - angle)) / (5 * doublePi - (4 * angle * (M_PI - angle)));
 }
 
-#if 0
-#define A_atan 0.0776509570923569
-#define B_atan -0.287434475393028
-#define C_atan M_PI_4 - A_atan - B_atan
-__attribute__((always_inline)) static double atanBhaskara(double angle) {
- /* find formula to use */
- if (angle > 1.437) {
-  if (angle > 11) {
-   return 1.5;
-  }
-  return (angle - 10.57) * (angle - 10.57) * -1.005 + 1.47;
-  if (angle 
- } else if (angle < -1.212) {
-  
- } else {
-  /* main formula */
-  double angleSquared = angle*angle;
-  return ((A*angleSquared+B)*angleSquared+C)*angle;
- }
-}
-#else
-
 /* this is terribly inaccurate... */
-#define BETTER_ACCURACY 1
-#if BETTER_ACCURACY
-//__attribute__((always_inline)) static double atanSnoolie(double angle) {
 double atanSnoolie(double angle) {
  /* find formula to use */
  if (angle > 2.038) {
@@ -185,23 +185,6 @@ double atanSnoolie(double angle) {
   return M_PI_4 * angle - angle * (fabs(angle) - 1) * (0.2447 - (0.00722 * fabs(angle)));
  }
 }
-#else
-__attribute__((always_inline)) static double atanSnoolie(double angle) {
- /* find formula to use */
- if (angle > 2.038) {
-  /* 1.1607 * 0.05 * angle + 1; would be more accurate for 2.0625-2.0695 */
-  //return 1.1607 * 0.05 * angle + 1;
-  return (0.16 * angle) + 0.789;
- } else if (angle < -2.0713) {
-  return 1.1607 * 0.05 * angle - 0.95;
- } else {
-  /* main formula */
-  return M_PI_4 * angle - angle * (fabs(angle) - 1) * 0.23;
- }
-}
-#endif
-
-#endif
 
 #define M_PI_10 M_PI/10 /* PLEASE compile with compiler optimizations to save a div... */
 
@@ -239,10 +222,7 @@ double speedtest_libc_cos(void) {
  }
 
  /* get time */
- double elapsed_time = (double)(clock() - startTime) / CLOCKS_PER_SEC;
-
- //printf("elapsed_time: %f\n", elapsed_time);
- return elapsed_time;
+ return (double)(clock() - startTime) / CLOCKS_PER_SEC;
 }
 
 double speedtest_bhaskara_cos(void) {
@@ -276,10 +256,7 @@ double speedtest_libc_sin(void) {
  }
 
  /* get time */
- double elapsed_time = (double)(clock() - startTime) / CLOCKS_PER_SEC;
-
- //printf("elapsed_time: %f\n", elapsed_time);
- return elapsed_time;
+ return (double)(clock() - startTime) / CLOCKS_PER_SEC;
 }
 
 double speedtest_bhaskara_sin(void) {
@@ -295,10 +272,7 @@ double speedtest_bhaskara_sin(void) {
  }
 
  /* get time */
- double elapsed_time = (double)(clock() - startTime) / CLOCKS_PER_SEC;
-
- //printf("elapsed_time: %f\n", elapsed_time);
- return elapsed_time;
+ return (double)(clock() - startTime) / CLOCKS_PER_SEC;
 }
 
 double speedtest_libc_atan(void) {
@@ -313,10 +287,7 @@ double speedtest_libc_atan(void) {
  }
 
  /* get time */
- double elapsed_time = (double)(clock() - startTime) / CLOCKS_PER_SEC;
-
- //printf("elapsed_time: %f\n", elapsed_time);
- return elapsed_time;
+ return (double)(clock() - startTime) / CLOCKS_PER_SEC;
 }
 
 double speedtest_snoolie_atan(void) {
@@ -331,10 +302,7 @@ double speedtest_snoolie_atan(void) {
  }
 
  /* get time */
- double elapsed_time = (double)(clock() - startTime) / CLOCKS_PER_SEC;
-
- //printf("elapsed_time: %f\n", elapsed_time);
- return elapsed_time;
+ return (double)(clock() - startTime) / CLOCKS_PER_SEC;
 }
 
 double speedtest_snoolie_cosv1(void) {
@@ -361,11 +329,10 @@ void test_speedcases(void) {
  double bhaskara_max_wait = 0;
  double libc_max_wait = 0;
 
- double bhaskara_sin_time = speedtest_bhaskara_sin();
- double libc_sin_time = speedtest_libc_sin();
- if (bhaskara_sin_time > libc_sin_time) {
-  //printf("SLOWER!!\n");
- }
+ double bhaskara_sin_time = 0;
+ double libc_sin_time = 0;
+
+ 
  double averageTimeBhaskara = 0;
  double averageTimeLibc = 0;
  for (int i = 0; i < 100; i++) {
@@ -384,17 +351,6 @@ void test_speedcases(void) {
   averageTimeBhaskara += bhaskara_sin_time;
   averageTimeLibc += libc_sin_time;
  }
- #define BHASKARA 0
- #if BHASKARA
- printf("bhaskara total: %f\n", averageTimeBhaskara);
- printf("libc total: %f\n", averageTimeLibc);
- averageTimeBhaskara /= 100.0;
- averageTimeLibc /= 100.0;
- printf("bhaskara average: %f\n", averageTimeBhaskara);
- printf("libc average: %f\n", averageTimeLibc);
- printf("bhaskara max wait: %f\n", bhaskara_max_wait);
- printf("libc max wait: %f\n", libc_max_wait);
- #else
  printf("snoolie total: %f\n", averageTimeBhaskara);
  printf("libc total: %f\n", averageTimeLibc);
  averageTimeBhaskara /= 100.0;
@@ -403,9 +359,9 @@ void test_speedcases(void) {
  printf("libc average: %f\n", averageTimeLibc);
  printf("snoolie max wait: %f\n", bhaskara_max_wait);
  printf("libc max wait: %f\n", libc_max_wait);
- #endif
 }
 
+/* I just copied and pasted the above function, which is why the variables are bhaskara and libc */
 void test_speedcases_snoolie(void) {
  double bhaskara_max_wait = 0;
  double libc_max_wait = 0;
